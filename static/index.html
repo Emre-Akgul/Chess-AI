@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess AI Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #gameArea {
+            display: grid;
+            grid-template-columns: 100px 1fr; /* 100px for button, rest for the board */
+            grid-template-rows: auto 1fr auto; /* Top info, board, bottom info */
+            grid-template-areas:
+                "button top"
+                "button board"
+                "button bottom";
+            width: 80vw; /* 80% of the viewport width */
+            height: 80vh; /* 80% of the viewport height */
+            gap: 10px;
+            align-items: center;
+        }
+        #startButton {
+            grid-area: button;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            height: fit-content;
+        }
+        #topInfo {
+            grid-area: top;
+            text-align: chessBoard.center;
+        }
+        #bottomInfo {
+            grid-area: bottom;
+            text-align: chessBoard.center;
+        }
+        #chessBoard {
+            grid-area: board;
+            max-height: 600px;
+            max-width: 600px;
+            border: 3px solid #333;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameArea">
+        <div id="topInfo">Black: RandomBot <br> Time: <span id="timeBlack"></span></div>
+        <button id="startButton" onclick="startGame()">Start Game</button>
+        <img id="chessBoard" src="" alt="Chess Board">
+        <div id="bottomInfo">White: RandomBot <br> Time: <span id="timeWhite"></span></div>
+    </div>
+
+    <script>
+        const boardImage = document.getElementById('chessBoard');
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateBoard(); // Update the board as soon as the page loads
+            updateTime(); // Update the time initially
+        });
+
+        function startGame() {
+            document.getElementById('startButton').disabled = true;  // Disable the start button
+            fetch('/start_game')
+                .then(response => response.json())
+                .then(data => {
+                    updateBoard();
+                    playGame(); // Start playing automatically
+                });
+        }
+
+        function playGame() {
+            console.log("Requesting new move from server...");
+            fetch('/play_game')
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Received data: ", data);
+                    updateBoard();
+                    // Safely check for 'Game over' message
+                    if (data.message && !data.message.includes('Game over')) {
+                        setTimeout(playGame, 1000); // Continue playing every second
+                    } else {
+                        console.log("Game over detected.");  // Debug: Confirm game over detection
+                        document.getElementById('startButton').disabled = false;  // Re-enable the start button
+                        alert(data.message || "Game over"); // Notify the game is over, defaulting to "Game over" if no message is provided
+                    }
+                })
+                .catch(error => {
+                    console.error('Error playing game:', error);
+                    document.getElementById('startButton').disabled = false;  // Re-enable the start button on error
+                });
+        }
+
+        function updateBoard() {
+            boardImage.src = '/board/image?' + new Date().getTime(); // Avoid caching issues, ensure fresh image is loaded
+        }
+
+        function updateTime() {
+            fetch('/get_time')
+                .then(response => response.json())
+                .then(data => {
+                    // Check if time data is valid and update the UI
+                    if (data.time_white !== undefined && data.time_black !== undefined) {
+                        document.getElementById('timeWhite').textContent = formatTime(data.time_white);
+                        document.getElementById('timeBlack').textContent = formatTime(data.time_black);
+                    }
+
+                    // Check if the game should end due to timeout
+                    if (data.time_white <= 0 || data.time_black <= 0) {
+                        alert("Game over due to time out!");
+                        clearInterval(timeInterval);
+                    }
+                })
+                .catch(error => console.error('Failed to fetch time:', error));
+        }
+
+        const timeInterval = setInterval(updateTime, 100); // Update every second
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>

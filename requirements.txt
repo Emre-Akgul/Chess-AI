@@ -1,0 +1,8 @@
+fastapi==0.79.0
+uvicorn[standard]==0.17.6
+pydantic==1.9.0
+sqlalchemy==1.4.31
+mysql-connector-python==8.0.28
+alembic==1.8.0
+python-chess==0.31.4
+cairosvg==2.5.2
