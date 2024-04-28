@@ -34,11 +34,11 @@
         }
         #topInfo {
             grid-area: top;
-            text-align: chessBoard.center;
+            text-align: center;
         }
         #bottomInfo {
             grid-area: bottom;
-            text-align: chessBoard.center;
+            text-align: center;
         }
         #chessBoard {
             grid-area: board;
@@ -51,28 +51,50 @@
 </head>
 <body>
     <div id="gameArea">
-        <div id="topInfo">Black: RandomBot <br> Time: <span id="timeBlack"></span></div>
+        <div id="topInfo">Black: RandomBot <br> Time: <span id="timeBlack">10:00.0</span></div>
         <button id="startButton" onclick="startGame()">Start Game</button>
         <img id="chessBoard" src="" alt="Chess Board">
-        <div id="bottomInfo">White: RandomBot <br> Time: <span id="timeWhite"></span></div>
+        <div id="bottomInfo">White: RandomBot <br> Time: <span id="timeWhite">10:00.0</span></div>
     </div>
 
     <script>
         const boardImage = document.getElementById('chessBoard');
-
-        document.addEventListener('DOMContentLoaded', function() {
-            updateBoard(); // Update the board as soon as the page loads
-            updateTime(); // Update the time initially
-        });
+        let timeWhite = 600000;  // 10 minutes in milliseconds
+        let timeBlack = 600000;
+        let currentPlayerTurn = 'white';  // Start with white's turn
+        let timeInterval;
 
         function startGame() {
-            document.getElementById('startButton').disabled = true;  // Disable the start button
+            document.getElementById('startButton').disabled = true;
+            timeWhite = 600000;  // 10 minutes in milliseconds
+            timeBlack = 600000;
             fetch('/start_game')
                 .then(response => response.json())
                 .then(data => {
                     updateBoard();
                     playGame(); // Start playing automatically
+                    startTimer();
                 });
+        }
+
+        function startTimer() {
+            timeInterval = setInterval(() => {
+                if (currentPlayerTurn === 'white') {
+                    timeWhite -= 100;  // Decrement 100 milliseconds for white
+                    document.getElementById('timeWhite').textContent = formatTime(timeWhite);
+                    if (timeWhite <= 0) {
+                        clearInterval(timeInterval);
+                        alert('Time up! Game over for White.');
+                    }
+                } else {
+                    timeBlack -= 100; // Decrement 100 milliseconds for black
+                    document.getElementById('timeBlack').textContent = formatTime(timeBlack);
+                    if (timeBlack <= 0) {
+                        clearInterval(timeInterval);
+                        alert('Time up! Game over for Black.');
+                    }
+                }
+            }, 100);
         }
 
         function playGame() {
@@ -82,50 +104,33 @@
                 .then(data => {
                     console.log("Received data: ", data);
                     updateBoard();
-                    // Safely check for 'Game over' message
                     if (data.message && !data.message.includes('Game over')) {
-                        setTimeout(playGame, 1000); // Continue playing every second
+                        // Toggle the turn after each move
+                        currentPlayerTurn = currentPlayerTurn === 'white' ? 'black' : 'white';
+                        playGame(); // Continue playing immediately
                     } else {
-                        console.log("Game over detected.");  // Debug: Confirm game over detection
-                        document.getElementById('startButton').disabled = false;  // Re-enable the start button
-                        alert(data.message || "Game over"); // Notify the game is over, defaulting to "Game over" if no message is provided
+                        console.log("Game over detected.");
+                        document.getElementById('startButton').disabled = false;
+                        clearInterval(timeInterval);
+                        alert(data.message || "Game over");
                     }
                 })
                 .catch(error => {
                     console.error('Error playing game:', error);
-                    document.getElementById('startButton').disabled = false;  // Re-enable the start button on error
+                    document.getElementById('startButton').disabled = false;
                 });
         }
 
+
         function updateBoard() {
-            boardImage.src = '/board/image?' + new Date().getTime(); // Avoid caching issues, ensure fresh image is loaded
+            boardImage.src = '/board/image?' + new Date().getTime(); // Append the current timestamp to prevent caching
         }
 
-        function updateTime() {
-            fetch('/get_time')
-                .then(response => response.json())
-                .then(data => {
-                    // Check if time data is valid and update the UI
-                    if (data.time_white !== undefined && data.time_black !== undefined) {
-                        document.getElementById('timeWhite').textContent = formatTime(data.time_white);
-                        document.getElementById('timeBlack').textContent = formatTime(data.time_black);
-                    }
-
-                    // Check if the game should end due to timeout
-                    if (data.time_white <= 0 || data.time_black <= 0) {
-                        alert("Game over due to time out!");
-                        clearInterval(timeInterval);
-                    }
-                })
-                .catch(error => console.error('Failed to fetch time:', error));
-        }
-
-        const timeInterval = setInterval(updateTime, 100); // Update every second
-
-        function formatTime(seconds) {
-            const minutes = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        function formatTime(milliseconds) {
+            const minutes = Math.floor(milliseconds / 60000);
+            const seconds = Math.floor((milliseconds % 60000) / 1000);
+            const millis = (milliseconds % 1000 / 10).toFixed(0).padStart(2, '0');  // Convert to two digits
+            return `${minutes}:${seconds.toString().padStart(2, '0')}.${millis}`;
         }
     </script>
 </body>

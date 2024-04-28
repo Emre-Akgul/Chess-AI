@@ -4,7 +4,7 @@ FROM python:3.9-slim
 # Set the working directory to /app
 WORKDIR /app
 
-# Install system libraries required for cairocffi
+# Install necessary system libraries
 RUN apt-get update && apt-get install -y \
     libcairo2 \
     libpango-1.0-0 \
@@ -12,21 +12,24 @@ RUN apt-get update && apt-get install -y \
     libgdk-pixbuf2.0-0 \
     libffi-dev \
     shared-mime-info \
+    openssl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy the current directory contents into the container at /app
-COPY requirements.txt /app/
-# Install any needed packages specified in requirements.txt
+# Install Python packages from requirements
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your app's source code from your host to your image filesystem.
-COPY ./app /app
+# Generate self-signed SSL certificates
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout key.pem -out cert.pem -subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com"
 
-# Make port 8000 available to the world outside this container
+# Copy your application code
+COPY ./app .
+
+# Expose the port the app runs on
 EXPOSE 8000
 
 # Define environment variable
 ENV NAME World
 
-# Run app.py when the container launches
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Command to run the application
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--ssl-keyfile=key.pem", "--ssl-certfile=cert.pem"]
