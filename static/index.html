@@ -14,32 +14,44 @@
         }
         #gameArea {
             display: grid;
-            grid-template-columns: 100px 1fr; /* 100px for button, rest for the board */
+            grid-template-columns: 100px 1fr; /* Left column for buttons, right column for the board */
             grid-template-rows: auto 1fr auto; /* Top info, board, bottom info */
             grid-template-areas:
-                "button top"
-                "button board"
-                "button bottom";
+                "button1 topInfo"
+                "button2 board"
+                "button2 bottomInfo";
             width: 80vw; /* 80% of the viewport width */
             height: 80vh; /* 80% of the viewport height */
             gap: 10px;
             align-items: center;
         }
+
+        /*Still overalppaing */
         #startButton {
-            grid-area: button;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            height: fit-content;
+            grid-area: button1;
+            margin: 0;
+            padding: 10px;
+            width: 100%;
         }
+
+        /* specify coordinates */
+        #testButton {
+            grid-area: button2;
+            margin: 0;
+            padding: 10px;    
+            width: 100%;
+        }
+
         #topInfo {
-            grid-area: top;
+            grid-area: topInfo;
             text-align: center;
         }
+
         #bottomInfo {
-            grid-area: bottom;
+            grid-area: bottomInfo;
             text-align: center;
         }
+
         #chessBoard {
             grid-area: board;
             max-height: 600px;
@@ -47,47 +59,92 @@
             border: 3px solid #333;
             object-fit: contain;
         }
+
+
     </style>
 </head>
 <body>
     <div id="gameArea">
-        <div id="topInfo">Black: RandomBot <br> Time: <span id="timeBlack">10:00.0</span></div>
-        <button id="startButton" onclick="startGame()">Start Game</button>
+        <div id="topInfo">
+            <select id="blackPlayerType">
+                <option value="RandomPlayer">Random Bot</option>
+            </select>
+            Black Time: <span id="timeBlack">1:00.0</span>
+        </div>
+
+        <button id="startButton" onclick="startGame()">Play One Game</button>
+        <button id="testButton" onclick="startTest()">Run Test</button>
+
         <img id="chessBoard" src="" alt="Chess Board">
-        <div id="bottomInfo">White: RandomBot <br> Time: <span id="timeWhite">10:00.0</span></div>
+
+        <div id="bottomInfo">
+            <select id="whitePlayerType">
+                <option value="RandomPlayer">Random Bot</option>
+            </select>
+            White Time: <span id="timeWhite">1:00.0</span>
+        </div>
     </div>
 
     <script>
+
+
         const boardImage = document.getElementById('chessBoard');
-        let timeWhite = 600000;  // 10 minutes in milliseconds
-        let timeBlack = 600000;
+        let timeWhite = 60000;  // 1 minute in milliseconds
+        let timeBlack = 60000;
         let currentPlayerTurn = 'white';  // Start with white's turn
         let timeInterval;
+        let gameInProgress = false;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateBoard(); // Load the initial state of the board
+            document.getElementById('startButton').addEventListener('click', startGame);
+        });
 
         function startGame() {
+            const whitePlayerType = document.getElementById('whitePlayerType').value;
+            const blackPlayerType = document.getElementById('blackPlayerType').value;
             document.getElementById('startButton').disabled = true;
-            timeWhite = 600000;  // 10 minutes in milliseconds
-            timeBlack = 600000;
-            fetch('/start_game')
-                .then(response => response.json())
-                .then(data => {
-                    updateBoard();
-                    playGame(); // Start playing automatically
-                    startTimer();
-                });
+            timeWhite = 60000;  // 1 minute in milliseconds
+            timeBlack = 60000;
+            gameInProgress = true;
+
+            const requestData = {
+                white_type: whitePlayerType,
+                black_type: blackPlayerType
+            };
+
+            fetch('/start_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateBoard();
+                playGame(); // Start playing automatically
+                startTimer();
+            });
         }
+
 
         function startTimer() {
             timeInterval = setInterval(() => {
+                if (!gameInProgress) {
+                    clearInterval(timeInterval);
+                    return;
+                }
+
                 if (currentPlayerTurn === 'white') {
-                    timeWhite -= 100;  // Decrement 100 milliseconds for white
+                    timeWhite -= 10;  // Decrement 10 milliseconds for white
                     document.getElementById('timeWhite').textContent = formatTime(timeWhite);
                     if (timeWhite <= 0) {
                         clearInterval(timeInterval);
                         alert('Time up! Game over for White.');
                     }
                 } else {
-                    timeBlack -= 100; // Decrement 100 milliseconds for black
+                    timeBlack -= 10; // Decrement 10 milliseconds for black
                     document.getElementById('timeBlack').textContent = formatTime(timeBlack);
                     if (timeBlack <= 0) {
                         clearInterval(timeInterval);
@@ -104,32 +161,65 @@
                 .then(data => {
                     console.log("Received data: ", data);
                     updateBoard();
-                    if (data.message && !data.message.includes('Game over')) {
-                        // Toggle the turn after each move
-                        currentPlayerTurn = currentPlayerTurn === 'white' ? 'black' : 'white';
-                        playGame(); // Continue playing immediately
-                    } else {
+                    if (data.message.includes('Game over')) {
                         console.log("Game over detected.");
                         document.getElementById('startButton').disabled = false;
-                        clearInterval(timeInterval);
-                        alert(data.message || "Game over");
+                        clearInterval(timeInterval); // Ensure the timer is stopped when the game is over
+                        gameInProgress = false;
+                    } else {
+                        // Toggle the turn after each move and continue the game
+                        currentPlayerTurn = currentPlayerTurn === 'white' ? 'black' : 'white';
+                        playGame(); // Continue playing immediately
                     }
                 })
                 .catch(error => {
                     console.error('Error playing game:', error);
                     document.getElementById('startButton').disabled = false;
+                    clearInterval(timeInterval); // Also ensure to stop the timer if there's an error
                 });
         }
 
+       function startTest() {
+            const requestData = {
+                white_type: document.getElementById('whitePlayerType').value,
+                black_type: document.getElementById('blackPlayerType').value,
+                game_count: 1000
+            };
+            document.getElementById('testButton').disabled = true;
+            document.getElementById('startButton').disabled = true;
+
+            fetch('/test_games', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Test completed:", data);
+                alert(`Test Results: \nWhite Wins: ${data.white_wins}\nBlack Wins: ${data.black_wins}\nDraws: ${data.draws}`);
+                document.getElementById('testButton').disabled = false;
+                document.getElementById('startButton').disabled = false;
+            })
+            .catch(error => {
+                console.error('Error running tests:', error);
+                alert('Failed to run tests.');
+                document.getElementById('testButton').disabled = false;
+                document.getElementById('startButton').disabled = false;
+            });
+        }
+
+
 
         function updateBoard() {
-            boardImage.src = '/board/image?' + new Date().getTime(); // Append the current timestamp to prevent caching
+            boardImage.src = '/board/image?' + new Date().getTime();
         }
 
         function formatTime(milliseconds) {
             const minutes = Math.floor(milliseconds / 60000);
             const seconds = Math.floor((milliseconds % 60000) / 1000);
-            const millis = (milliseconds % 1000 / 10).toFixed(0).padStart(2, '0');  // Convert to two digits
+            const millis = (milliseconds % 1000 / 10).toFixed(0).padStart(2, '0');
             return `${minutes}:${seconds.toString().padStart(2, '0')}.${millis}`;
         }
     </script>
