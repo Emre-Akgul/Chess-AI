@@ -72,7 +72,7 @@
             Black Time: <span id="timeBlack">1:00.0</span>
         </div>
 
-        <button id="startButton" onclick="startGame()">Play One Game</button>
+        <button id="startButton" >Play One Game</button>
         <button id="testButton" onclick="startTest()">Run Test</button>
 
         <img id="chessBoard" src="" alt="Chess Board">
@@ -101,6 +101,8 @@
         });
 
         function startGame() {
+
+
             const whitePlayerType = document.getElementById('whitePlayerType').value;
             const blackPlayerType = document.getElementById('blackPlayerType').value;
             document.getElementById('startButton').disabled = true;
@@ -113,7 +115,7 @@
                 black_type: blackPlayerType
             };
 
-            fetch('/start_game', {
+            fetch('http://localhost:8000/start_game', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -156,7 +158,7 @@
 
         function playGame() {
             console.log("Requesting new move from server...");
-            fetch('/play_game')
+            fetch('http://localhost:8000/play_game')
                 .then(response => response.json())
                 .then(data => {
                     console.log("Received data: ", data);
@@ -188,7 +190,7 @@
             document.getElementById('testButton').disabled = true;
             document.getElementById('startButton').disabled = true;
 
-            fetch('/test_games', {
+            fetch('http://localhost:8000/test_games', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
