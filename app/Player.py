@@ -77,11 +77,6 @@ class Level0ThinkerPlayer(Player):
             [0.2, 0.3, 0.1, 0.0, 0.0, 0.1, 0.3, 0.2]
         ])
 
-        self.transposition_table = {}  # Stores board hashes and best moves
-        self.pv_table = {}  # Stores principal variation moves from the previous iteration
-        self.history_heuristic = {}  # History heuristic table
-        self.killer_moves = [[] for _ in range(100)]  # Store two killer moves per depth
-
     # Convert square to (row, col) in the 8x8 board representation
     def square_to_index(self, square):
         row = 7 - (square // 8)
