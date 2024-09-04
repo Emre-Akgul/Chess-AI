@@ -67,19 +67,19 @@
     <div id="gameArea">
         <div id="topInfo">
             <select id="blackPlayerType">
-                <option value="RandomPlayer">Random Bot</option>
+                <!-- Options will be dynamically populated -->
             </select>
             Black Time: <span id="timeBlack">1:00.0</span>
         </div>
 
-        <button id="startButton" >Play One Game</button>
+        <button id="startButton">Play One Game</button>
         <button id="testButton" onclick="startTest()">Run Test</button>
 
         <img id="chessBoard" src="" alt="Chess Board">
 
         <div id="bottomInfo">
             <select id="whitePlayerType">
-                <option value="RandomPlayer">Random Bot</option>
+                <!-- Options will be dynamically populated -->
             </select>
             White Time: <span id="timeWhite">1:00.0</span>
         </div>
@@ -97,8 +97,40 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             updateBoard(); // Load the initial state of the board
+            fetchPlayerTypes(); // Fetch available player types
             document.getElementById('startButton').addEventListener('click', startGame);
         });
+
+        function fetchPlayerTypes() {
+            fetch('http://localhost:8000/player_types')
+                .then(response => response.json())
+                .then(data => {
+                    const whitePlayerSelect = document.getElementById('whitePlayerType');
+                    const blackPlayerSelect = document.getElementById('blackPlayerType');
+
+                    // Clear existing options
+                    whitePlayerSelect.innerHTML = '';
+                    blackPlayerSelect.innerHTML = '';
+
+                    // Populate the dropdowns with the available player types
+                    data.players.forEach(playerType => {
+                        const whiteOption = document.createElement('option');
+                        whiteOption.value = playerType;
+                        whiteOption.textContent = playerType.replace('Player', '') + ' Bot';
+                        whitePlayerSelect.appendChild(whiteOption);
+
+                        const blackOption = document.createElement('option');
+                        blackOption.value = playerType;
+                        blackOption.textContent = playerType.replace('Player', '') + ' Bot';
+                        blackPlayerSelect.appendChild(blackOption);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching player types:', error);
+                });
+        }
+
+
 
         function startGame() {
 
@@ -139,22 +171,25 @@
                 }
 
                 if (currentPlayerTurn === 'white') {
-                    timeWhite -= 10;  // Decrement 10 milliseconds for white
+                    timeWhite -= 100;  // Decrement 100 milliseconds for white
                     document.getElementById('timeWhite').textContent = formatTime(timeWhite);
                     if (timeWhite <= 0) {
                         clearInterval(timeInterval);
                         alert('Time up! Game over for White.');
+                        gameInProgress = false;
                     }
                 } else {
-                    timeBlack -= 10; // Decrement 10 milliseconds for black
+                    timeBlack -= 100;  // Decrement 100 milliseconds for black
                     document.getElementById('timeBlack').textContent = formatTime(timeBlack);
                     if (timeBlack <= 0) {
                         clearInterval(timeInterval);
                         alert('Time up! Game over for Black.');
+                        gameInProgress = false;
                     }
                 }
-            }, 100);
+            }, 100);  // Set the interval to 100 milliseconds
         }
+
 
         function playGame() {
             console.log("Requesting new move from server...");

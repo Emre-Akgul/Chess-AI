@@ -3,7 +3,12 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 import chess
 import chess.svg
-from app.Player import RandomPlayer
+from app.Player import Player
+from app.Player import RandomPlayer, Level0ThinkerPlayer
+
+import inspect
+import sys
+
 import time
 from pydantic import BaseModel
 
@@ -34,6 +39,25 @@ player1 = None
 player2 = None
 game_board = chess.Board()
 
+
+# Discover all Player subclasses dynamically
+def get_player_classes():
+    player_classes = {}
+    for name, obj in inspect.getmembers(sys.modules['app.Player'], inspect.isclass):
+        if issubclass(obj, Player) and obj is not Player:
+            player_classes[name] = obj
+    return player_classes
+
+@app.get("/player_types")
+def get_player_types():
+    player_classes = get_player_classes()
+    return {"players": list(player_classes.keys())}
+
+def create_player(player_type, color):
+    player_classes = get_player_classes()
+    if player_type in player_classes:
+        return player_classes[player_type](f"{player_type}{color}", color)
+    return None
 
 @app.get("/play_game")
 def play_game():
@@ -66,12 +90,6 @@ async def get_board_image():
     board_svg = chess.svg.board(board=game_board)
     return Response(content=board_svg, media_type="image/svg+xml")
 
-@app.get("/player_types")
-def get_player_types():
-    # Future implementation can fetch dynamically from a list of player classes
-    return {"players": ["RandomPlayer"]}
-
-
 class StartGameRequest(BaseModel):
     white_type: str
     black_type: str
@@ -79,10 +97,10 @@ class StartGameRequest(BaseModel):
 @app.post("/start_game")
 def start_game(request: StartGameRequest):
     global player1, player2, game_board
-    player1 = RandomPlayer("RandomPlayer1", chess.WHITE) if request.white_type == "RandomPlayer" else None
-    player2 = RandomPlayer("RandomPlayer2", chess.BLACK) if request.black_type == "RandomPlayer" else None
+    player1 = create_player(request.white_type, chess.WHITE)
+    player2 = create_player(request.black_type, chess.BLACK)
     game_board.reset()
-    return {"message": "Game started with {} vs {}".format(request.white_type, request.black_type), "board": game_board.fen()}
+    return {"message": f"Game started with {request.white_type} vs {request.black_type}", "board": game_board.fen()}
 
 class TestGameRequest(BaseModel):
     white_type: str = "RandomPlayer"
@@ -122,5 +140,6 @@ async def simulate_game(white_type, black_type):
 def create_player(player_type, color):
     if player_type == "RandomPlayer":
         return RandomPlayer(f"RandomPlayer{color}", color)
-    # Add more player types as needed
+    elif player_type == "Level0ThinkerPlayer":
+        return Level0ThinkerPlayer(f"Level0ThinkerPlayer{color}", color)
     return None
