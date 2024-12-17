@@ -30,7 +30,14 @@ middleware = [
 ]
 app = FastAPI(middleware=middleware)
 
-# app.add_middleware(GZipMiddleware, minimum_size=1000)
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace "*" with specific allowed origins if needed
+    allow_methods=["*"],  # Allow all HTTP methods: GET, POST, OPTIONS, etc.
+    allow_headers=["*"],  # Allow all headers
+)
 
 app.mount("/static", StaticFiles(directory="static", html=True), name="static")
 
@@ -61,6 +68,8 @@ def create_player(player_type, color):
 
 @app.get("/play_game")
 def play_game():
+    global game_board  # Make it explicit we're using the global board
+    
     if game_board.is_game_over():
         result = "Game over"
         if game_board.is_checkmate():
@@ -73,7 +82,16 @@ def play_game():
     
     # Decide who's turn it is
     player = player1 if game_board.turn == chess.WHITE else player2
-    move = player.make_move(game_board, time=None)
+    
+    # Get the move
+    move = player.make_move(game_board.copy(), time=None)  # Pass a copy to prevent state corruption
+    
+    # Verify the move is legal
+    if move is None or move not in game_board.legal_moves:
+        return {"move": None, "board": game_board.fen(), "message": "Illegal move attempted"}
+    
+    # Make the move on the actual board
+    game_board.push(move)
     
     return {"move": move.uci(), "board": game_board.fen(), "message": "Move made"}
 
@@ -101,6 +119,7 @@ def start_game(request: StartGameRequest):
     player2 = create_player(request.black_type, chess.BLACK)
     game_board.reset()
     return {"message": f"Game started with {request.white_type} vs {request.black_type}", "board": game_board.fen()}
+
 
 class TestGameRequest(BaseModel):
     white_type: str = "RandomPlayer"

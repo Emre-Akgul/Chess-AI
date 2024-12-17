@@ -29,19 +29,15 @@ class Level0ThinkerPlayer(Player):
     def __init__(self, name, color):
         super().__init__(name, color)
 
-        self.piece_values = {
-            chess.PAWN: 1,
-            chess.KNIGHT: 3,
-            chess.BISHOP: 3,
-            chess.ROOK: 5,
-            chess.QUEEN: 9,
-            chess.KING: 0  # King's value is set to 0 because it cannot be captured
-        }
+        self.piece_values = np.zeros(7, dtype=np.float32)
+        self.piece_values[chess.PAWN] = 1.0
+        self.piece_values[chess.KNIGHT] = 3.0
+        self.piece_values[chess.BISHOP] = 3.0
+        self.piece_values[chess.ROOK] = 5.0
+        self.piece_values[chess.QUEEN] = 9.0
+        self.piece_values[chess.KING] = 0.0  # King's value is set to 0 because it cannot be captured
 
-
-        # Define position-piece matrices
-
-        # Pawn position values
+        # Position tables remain unchanged
         self.pawn_table = np.array([
             [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
@@ -53,7 +49,6 @@ class Level0ThinkerPlayer(Player):
             [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         ])
 
-        # Knight position values
         self.knight_table = np.array([
             [-0.5, -0.4, -0.3, -0.3, -0.3, -0.3, -0.4, -0.5],
             [-0.4, -0.2, 0.0, 0.0, 0.0, 0.0, -0.2, -0.4],
@@ -65,7 +60,6 @@ class Level0ThinkerPlayer(Player):
             [-0.5, -0.4, -0.3, -0.3, -0.3, -0.3, -0.4, -0.5]
         ])
 
-        # King position values (assuming middle game)
         self.king_table = np.array([
             [-0.3, -0.4, -0.4, -0.5, -0.5, -0.4, -0.4, -0.3],
             [-0.3, -0.4, -0.4, -0.5, -0.5, -0.4, -0.4, -0.3],
@@ -76,12 +70,6 @@ class Level0ThinkerPlayer(Player):
             [0.2, 0.2, 0.0, 0.0, 0.0, 0.0, 0.2, 0.2],
             [0.2, 0.3, 0.1, 0.0, 0.0, 0.1, 0.3, 0.2]
         ])
-
-    # Convert square to (row, col) in the 8x8 board representation
-    def square_to_index(self, square):
-        row = 7 - (square // 8)
-        col = square % 8
-        return row, col
 
     def evaluate_board(self, board):
         """
@@ -99,7 +87,8 @@ class Level0ThinkerPlayer(Player):
             return 0  # Draw positions are neutral
 
         score = 0
-        for piece_type in self.piece_values:
+        # Instead of iterating over piece_values dict, iterate over piece types directly
+        for piece_type in range(1, 7):  # 1=PAWN through 6=KING
             for square in board.pieces(piece_type, chess.WHITE):
                 score += self.piece_values[piece_type]
                 # Apply position piece matrices for White
@@ -128,7 +117,6 @@ class Level0ThinkerPlayer(Player):
 
         return score
 
-
     def move_sort_key(self, board, move):
         """
         Sorting key function to prioritize moves based on an advanced hierarchical order:
@@ -152,8 +140,8 @@ class Level0ThinkerPlayer(Player):
 
         # Priority 2: Captures with MVV-LVA (Most Valuable Victim - Least Valuable Attacker)
         if captured_piece and attacker_piece:
-            attacker_value = self.piece_values.get(attacker_piece.piece_type, 0)
-            captured_value = self.piece_values.get(captured_piece.piece_type, 0)
+            attacker_value = self.piece_values[attacker_piece.piece_type]  # Direct array access
+            captured_value = self.piece_values[captured_piece.piece_type]  # Direct array access
 
             # MVV-LVA calculation: prioritize capturing higher-value pieces with lower-value pieces
             mvv_lva_value = captured_value - attacker_value  # Range: [-8, 8]
@@ -173,7 +161,7 @@ class Level0ThinkerPlayer(Player):
         # Priority 4: Threats (moves that attack high-value pieces), scaled to 0-2
         attacked_piece = board.piece_at(move.to_square)
         if attacked_piece:
-            attacked_value = self.piece_values.get(attacked_piece.piece_type, 0)
+            attacked_value = self.piece_values[attacker_piece.piece_type] 
 
             # Scale the attacked piece value to a range between 0 and 2
             # Pawn attack (1) should be lower than a Queen attack (9)
@@ -198,6 +186,12 @@ class Level0ThinkerPlayer(Player):
         # Priority 7: Quiet moves (non-capturing, non-checking moves that improve position)
         board.pop()
         return 7
+    
+    # Convert square to (row, col) in the 8x8 board representation
+    def square_to_index(self, square):
+        row = 7 - (square // 8)
+        col = square % 8
+        return row, col
 
     def minimax(self, board, depth, alpha, beta, is_maximizing):
         """
@@ -262,9 +256,10 @@ class Level0ThinkerPlayer(Player):
 
     def make_move(self, board, time):
         """
-        Implements a minimax strategy with alpha-beta pruning, move sorting, 
-        and iterative deepening to search progressively deeper up to 3 moves ahead.
+        Implements a minimax strategy with alpha-beta pruning and move sorting
+        at a fixed depth of 3 moves.
         """
+        depth = 3  # Fixed depth instead of iterative deepening
         best_move = None
         best_value = float('-inf') if self.color == chess.WHITE else float('inf')
         alpha = float('-inf')
@@ -272,49 +267,38 @@ class Level0ThinkerPlayer(Player):
         equal_moves = []
 
         legal_moves = list(board.legal_moves)
-        
         # Sort moves based on the defined hierarchy: checks > captures > promotions > other
         legal_moves.sort(key=lambda move: self.move_sort_key(board, move))
+        
+        for move in legal_moves:
+            board.push(move)
+            board_value = self.minimax(board, depth - 1, alpha, beta, board.turn == chess.WHITE)
+            board.pop()
 
-        # Iterative deepening: progressively deepen the search
-        for depth in range(1, 4):  # Start at depth 1, go up to depth 3
-            current_best_move = None
-            current_best_value = float('-inf') if self.color == chess.WHITE else float('inf')
-            
-            for move in legal_moves:
-                board.push(move)
-                board_value = self.minimax(board, depth, alpha, beta, board.turn == chess.WHITE)
-                board.pop()
-
-                if self.color == chess.WHITE:
-                    if board_value > current_best_value:
-                        current_best_value = board_value
-                        current_best_move = move
-                        equal_moves = [move]
-                    elif board_value == current_best_value:
-                        equal_moves.append(move)
-                else:
-                    if board_value < current_best_value:
-                        current_best_value = board_value
-                        current_best_move = move
-                        equal_moves = [move]
-                    elif board_value == current_best_value:
-                        equal_moves.append(move)
-
-            # If multiple moves have the same score, pick one randomly
-            if equal_moves:
-                current_best_move = random.choice(equal_moves)
-
-            # Store the best move and its value from this depth
-            best_move = current_best_move
-            best_value = current_best_value
-            
-            # Print current evaluation for each depth
             if self.color == chess.WHITE:
-                print(f"Depth {depth} - Turn of White - Evaluation: {best_value}", flush=True)
+                if board_value > best_value:
+                    best_value = board_value
+                    best_move = move
+                    equal_moves = [move]
+                elif board_value == best_value:
+                    equal_moves.append(move)
             else:
-                print(f"Depth {depth} - Turn of Black - Evaluation: {best_value}", flush=True)
+                if board_value < best_value:
+                    best_value = board_value
+                    best_move = move
+                    equal_moves = [move]
+                elif board_value == best_value:
+                    equal_moves.append(move)
 
+        # If multiple moves have the same score, pick one randomly
+        if equal_moves:
+            best_move = random.choice(equal_moves)
+
+        # Print final evaluation
+        if self.color == chess.WHITE:
+            print(f"Turn of White - Evaluation: {best_value}", flush=True)
+        else:
+            print(f"Turn of Black - Evaluation: {best_value}", flush=True)
 
         if best_move:
             board.push(best_move)
